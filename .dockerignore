@@ -1,0 +1,11 @@
+# 避免将本地缓存、配置和生成结果复制进镜像。
+.git
+.idea
+.venv
+__pycache__
+*.py[cod]
+.env
+data
+logs
+backups
+
