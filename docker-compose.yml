@@ -40,6 +40,8 @@ services:
       mysql:
         condition: service_healthy
     volumes:
+      - ./spiderflow:/app/spiderflow
+      - ./scrapy.cfg:/app/scrapy.cfg
       - ./data:/app/data
 
 volumes:
