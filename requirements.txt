@@ -6,4 +6,6 @@ PyMySQL==1.1.1
 APScheduler==3.10.4
 python-dotenv==1.0.1
 cryptography==44.0.0
+# 固定与当前 Scrapy 版本兼容的 Twisted，避免 SSL 私有接口不兼容。
+Twisted==25.5.0
 
