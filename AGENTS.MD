@@ -11,7 +11,10 @@
 
 - `spiderflow/`：Python 主应用包，包含 Scrapy 爬虫、数据处理、数据库访问和定时任务等业务代码。
 - `spiderflow/spiders/`：Scrapy 爬虫目录，存放外汇牌价等数据源的 Spider 定义。
-- `spiderflow/services/`：业务服务目录，存放数据清洗、入库、Pandas 分析和结果导出逻辑。
+- `spiderflow/items.py`：Scrapy Item 数据结构定义，描述汇率采集结果字段。
+- `spiderflow/pipelines.py`：Scrapy 数据管道，负责 Item 校验、转换和自动入库。
+- `spiderflow/services/`：可复用业务服务目录，存放数据库服务、Pandas 分析和结果导出逻辑。
+- `spiderflow/commands/`：命令行入口目录，存放手动执行的 CRUD 和数据维护命令。
 - `spiderflow/scheduler/`：定时任务目录，存放 APScheduler 任务及任务编排代码。
 - `spiderflow/config.py`：应用配置文件，统一读取和校验环境变量。
 - `spiderflow/db.py`：数据库连接工具，负责创建和管理 MySQL 连接。
@@ -29,7 +32,7 @@
 - `.env` / `.env.example`：环境变量文件；`.env` 仅供本地使用，不提交到版本库。
 - `AGENTS.MD`：AI 协作说明文件，记录项目目标、仓库结构和开发约束。
 
-业务代码只能放在 `spiderflow/` 下，容器基础设施文件只能放在 `docker/` 下；新增模块时应同步更新受影响的 `docs/` 文档。
+业务代码只能放在 `spiderflow/` 下，容器基础设施文件只能放在 `docker/` 下；Scrapy 自动处理逻辑放在 `items.py`、`pipelines.py` 和 `spiders/`，可复用业务逻辑放在 `services/`，手动命令入口放在 `commands/`；新增模块时应同步更新受影响的 `docs/` 文档。
 
 ---
 
