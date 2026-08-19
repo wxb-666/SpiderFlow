@@ -14,7 +14,7 @@
 - `spiderflow/items.py`：Scrapy Item 数据结构定义，描述汇率采集结果字段。
 - `spiderflow/pipelines.py`：Scrapy 数据管道，负责 Item 校验、转换和自动入库。
 - `spiderflow/services/`：可复用业务服务目录，存放数据库服务、Pandas 分析和结果导出逻辑。
-- `spiderflow/commands/`：命令行入口目录，存放手动执行的 CRUD 和数据维护命令。
+- `spiderflow/commands/`：命令行入口目录，存放手动执行的 CRUD、数据维护和分析导出命令。
 - `spiderflow/scheduler/`：定时任务目录，存放 APScheduler 任务及任务编排代码。
 - `spiderflow/config.py`：应用配置文件，统一读取和校验环境变量。
 - `spiderflow/db.py`：数据库连接工具，负责创建和管理 MySQL 连接。
