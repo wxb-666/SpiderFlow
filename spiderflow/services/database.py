@@ -223,6 +223,37 @@ class ExchangeRateService:
             result = connection.execute(delete_sql, {"rate_id": rate_id})
             return result.rowcount > 0
 
+    def delete_by_date_range(
+        self,
+        start_at: datetime,
+        end_at: datetime,
+        code: str | None = None,
+    ) -> int:
+        """删除指定发布时间范围内的汇率记录，并返回删除数量。"""
+        conditions = [
+            "e.published_at >= :start_at",
+            "e.published_at <= :end_at",
+        ]
+        params: dict[str, Any] = {
+            "start_at": start_at,
+            "end_at": end_at,
+        }
+        if code:
+            conditions.append("c.code = :code")
+            params["code"] = code.strip().upper()
+
+        delete_sql = text(
+            f"""
+            DELETE e
+            FROM exchange_rates e
+            JOIN currencies c ON c.id = e.currency_id
+            WHERE {' AND '.join(conditions)}
+            """
+        )
+        with self.engine.begin() as connection:
+            result = connection.execute(delete_sql, params)
+            return int(result.rowcount)
+
 
 class JobRunService:
     """提供 job_runs 表的任务日志操作。"""
@@ -305,4 +336,3 @@ class JobRunService:
         with self.engine.begin() as connection:
             result = connection.execute(delete_sql, {"run_id": run_id})
             return result.rowcount > 0
-
