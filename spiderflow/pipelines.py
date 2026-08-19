@@ -7,10 +7,11 @@ from typing import Any
 from scrapy import Item, Spider
 from scrapy.crawler import Crawler
 from scrapy.exceptions import DropItem
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine
 
 from spiderflow.config import get_settings
 from spiderflow.db import create_database_engine
+from spiderflow.services.database import ExchangeRateService
 
 
 class ExchangeRatePipeline:
@@ -19,6 +20,7 @@ class ExchangeRatePipeline:
     def __init__(self) -> None:
         # 引擎在爬虫启动后创建，因此初始化阶段允许为空。
         self.engine: Engine | None = None
+        self.rate_service: ExchangeRateService | None = None
 
     @classmethod
     def from_crawler(cls, crawler: Crawler) -> "ExchangeRatePipeline":
@@ -29,6 +31,7 @@ class ExchangeRatePipeline:
         """Spider 启动时建立数据库连接。"""
         settings = get_settings()
         self.engine = create_database_engine(settings)
+        self.rate_service = ExchangeRateService(self.engine)
 
     def close_spider(self, spider: Spider) -> None:
         """Spider 关闭时释放数据库连接池。"""
@@ -63,50 +66,13 @@ class ExchangeRatePipeline:
             "crawled_at": crawled_at,
         }
 
-        insert_sql = text(
-            """
-            INSERT INTO exchange_rates (
-                currency_id,
-                cash_buying_rate,
-                cash_selling_rate,
-                spot_buying_rate,
-                spot_selling_rate,
-                middle_rate,
-                published_at,
-                source_url,
-                crawled_at
-            )
-            SELECT
-                id,
-                :cash_buying_rate,
-                :cash_selling_rate,
-                :spot_buying_rate,
-                :spot_selling_rate,
-                :middle_rate,
-                :published_at,
-                :source_url,
-                :crawled_at
-            FROM currencies
-            WHERE name = :currency_name
-              AND is_active = 1
-            ON DUPLICATE KEY UPDATE
-                cash_buying_rate = VALUES(cash_buying_rate),
-                cash_selling_rate = VALUES(cash_selling_rate),
-                spot_buying_rate = VALUES(spot_buying_rate),
-                spot_selling_rate = VALUES(spot_selling_rate),
-                middle_rate = VALUES(middle_rate),
-                source_url = VALUES(source_url),
-                crawled_at = VALUES(crawled_at)
-            """
-        )
+        if self.rate_service is None:
+            raise RuntimeError("汇率数据库服务尚未初始化")
 
-        if self.engine is None:
-            raise RuntimeError("数据库引擎尚未初始化")
+        saved = self.rate_service.save_or_update(values)  # 将爬取并转化后的数据插入/更新到数据表
 
-        with self.engine.begin() as connection:
-            result = connection.execute(insert_sql, values)  # 执行sql语句
-
-        if result.rowcount == 0:  # 如果sql执行后没有任何改变，说明数据里面没有允许的币种
+        if not saved:
+            # 如果没变化，说明爬取到的数据中没有符合的币种（也有可能是完全相同的数据）
             raise DropItem(f"未找到启用中的币种：{item['currency_name']}")
 
-        return item  # 将数据传给下一个管道
+        return item
