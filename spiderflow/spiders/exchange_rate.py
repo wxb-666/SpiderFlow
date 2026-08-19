@@ -1,7 +1,11 @@
 """中国银行外汇牌价爬虫"""
 
 from datetime import datetime, timezone
+from collections.abc import Generator
+
 import scrapy
+from scrapy.http import Response
+
 from spiderflow.items import ExchangeRateItem
 
 
@@ -14,7 +18,7 @@ class ExchangeRateSpider(scrapy.Spider):
 
     target_currencies = {"美元", "欧元", "日元", "英镑"}  # 首期目标只看四种常见货币
 
-    def parse(self, response):
+    def parse(self, response: Response) -> Generator[ExchangeRateItem, None, None]:
         """解析牌价表，并生成 ExchangeRateItem。"""
         tables = response.css("table")
         if len(tables) <= 1:

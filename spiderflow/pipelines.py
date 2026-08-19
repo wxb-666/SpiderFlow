@@ -2,9 +2,12 @@
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Any
 
+from scrapy import Item, Spider
+from scrapy.crawler import Crawler
 from scrapy.exceptions import DropItem
-from sqlalchemy import text
+from sqlalchemy import Engine, text
 
 from spiderflow.config import get_settings
 from spiderflow.db import create_database_engine
@@ -13,25 +16,26 @@ from spiderflow.db import create_database_engine
 class ExchangeRatePipeline:
     """校验汇率数据并写入 MySQL。"""
 
-    def __init__(self):
-        self.engine = None
+    def __init__(self) -> None:
+        # 引擎在爬虫启动后创建，因此初始化阶段允许为空。
+        self.engine: Engine | None = None
 
     @classmethod
-    def from_crawler(cls, crawler):
+    def from_crawler(cls, crawler: Crawler) -> "ExchangeRatePipeline":
         """根据 Scrapy 配置创建 Pipeline。"""
         return cls()
 
-    def open_spider(self, spider):
+    def open_spider(self, spider: Spider) -> None:
         """Spider 启动时建立数据库连接。"""
         settings = get_settings()
         self.engine = create_database_engine(settings)
 
-    def close_spider(self, spider):
+    def close_spider(self, spider: Spider) -> None:
         """Spider 关闭时释放数据库连接池。"""
         if self.engine is not None:
             self.engine.dispose()
 
-    def process_item(self, item, spider):
+    def process_item(self, item: Item, spider: Spider) -> Item:
         """处理一条汇率数据并执行幂等写入"""
         published_at = datetime.strptime(
             item["published_at"],
@@ -43,7 +47,7 @@ class ExchangeRatePipeline:
             # 如果带了时区信息，就将时间转化UTC零时区时间，并将时区信息去掉
             crawled_at = crawled_at.astimezone(timezone.utc).replace(tzinfo=None)
 
-        def to_decimal(value):
+        def to_decimal(value: Any) -> Decimal | None:
             # 空牌价写入数据库 NULL，非空牌价转为Decimal（精度转化）
             return Decimal(str(value)) if value not in (None, "") else None
 
@@ -95,6 +99,9 @@ class ExchangeRatePipeline:
                 crawled_at = VALUES(crawled_at)
             """
         )
+
+        if self.engine is None:
+            raise RuntimeError("数据库引擎尚未初始化")
 
         with self.engine.begin() as connection:
             result = connection.execute(insert_sql, values)  # 执行sql语句
