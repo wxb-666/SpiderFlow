@@ -147,7 +147,7 @@ def handle_rate(args: argparse.Namespace, service: ExchangeRateService) -> None:
             "spot_selling_rate": args.spot_selling_rate,
             "middle_rate": args.middle_rate,
         }
-        print_json({"saved": service.save_or_update(data)})
+        print_json({"saved": service.save_or_update(data).value})
     elif args.action == "update":
         fields = {
             "cash_buying_rate": args.cash_buying_rate,
@@ -209,4 +209,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

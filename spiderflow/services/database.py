@@ -4,9 +4,19 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 from typing import Any, Mapping
 
 from sqlalchemy import Engine, text
+
+
+class ExchangeRateSaveStatus(str, Enum):
+    """汇率幂等写入的明确结果。"""
+
+    CREATED = "CREATED"
+    UPDATED = "UPDATED"
+    UNCHANGED = "UNCHANGED"
+    CURRENCY_NOT_FOUND = "CURRENCY_NOT_FOUND"
 
 
 class CurrencyService:
@@ -98,8 +108,8 @@ class ExchangeRateService:
         """将空值转换为 NULL，将牌价转换为 Decimal。"""
         return Decimal(str(value)) if value not in (None, "") else None
 
-    def save_or_update(self, data: Mapping[str, Any]) -> bool:
-        """按“币种名称 + 发布时间”幂等写入一条汇率记录。"""
+    def save_or_update(self, data: Mapping[str, Any]) -> ExchangeRateSaveStatus:
+        """按“币种名称 + 发布时间”幂等写入并返回明确状态。"""
         insert_sql = text(
             """
             INSERT INTO exchange_rates (
@@ -113,8 +123,8 @@ class ExchangeRateService:
                 source_url,
                 crawled_at
             )
-            SELECT
-                id,
+            VALUES (
+                :currency_id,
                 :cash_buying_rate,
                 :cash_selling_rate,
                 :spot_buying_rate,
@@ -123,9 +133,7 @@ class ExchangeRateService:
                 :published_at,
                 :source_url,
                 :crawled_at
-            FROM currencies
-            WHERE name = :currency_name
-              AND is_active = 1
+            )
             ON DUPLICATE KEY UPDATE
                 cash_buying_rate = VALUES(cash_buying_rate),
                 cash_selling_rate = VALUES(cash_selling_rate),
@@ -137,7 +145,6 @@ class ExchangeRateService:
             """
         )
         values = {
-            "currency_name": data["currency_name"],
             "cash_buying_rate": self._to_decimal(data.get("cash_buying_rate")),
             "cash_selling_rate": self._to_decimal(data.get("cash_selling_rate")),
             "spot_buying_rate": self._to_decimal(data.get("spot_buying_rate")),
@@ -147,9 +154,58 @@ class ExchangeRateService:
             "source_url": data["source_url"],
             "crawled_at": data.get("crawled_at", datetime.now()),
         }
+
+        currency_query = text(
+            """
+            SELECT id
+            FROM currencies
+            WHERE name = :currency_name
+              AND is_active = 1
+            """
+        )
+        existing_query = text(
+            """
+            SELECT cash_buying_rate, cash_selling_rate,
+                   spot_buying_rate, spot_selling_rate,
+                   middle_rate, source_url
+            FROM exchange_rates
+            WHERE currency_id = :currency_id
+              AND published_at = :published_at
+            """
+        )
+        comparable_fields = (
+            "cash_buying_rate",
+            "cash_selling_rate",
+            "spot_buying_rate",
+            "spot_selling_rate",
+            "middle_rate",
+            "source_url",
+        )
+
         with self.engine.begin() as connection:
+            currency = connection.execute(
+                currency_query,
+                {"currency_name": data["currency_name"]},
+            ).scalar_one_or_none()
+            if currency is None:
+                return ExchangeRateSaveStatus.CURRENCY_NOT_FOUND
+
+            values["currency_id"] = currency
+            existing = connection.execute(
+                existing_query,
+                {
+                    "currency_id": currency,
+                    "published_at": values["published_at"],
+                },
+            ).mappings().first()
             result = connection.execute(insert_sql, values)
-            return result.rowcount > 0
+            if existing is None:
+                return ExchangeRateSaveStatus.CREATED
+
+            # crawled_at 每次采集都会变化，不参与“内容是否相同”的判断。
+            if all(existing[field] == values[field] for field in comparable_fields):
+                return ExchangeRateSaveStatus.UNCHANGED
+            return ExchangeRateSaveStatus.UPDATED
 
     def list(
         self,

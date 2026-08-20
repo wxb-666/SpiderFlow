@@ -11,7 +11,7 @@ from sqlalchemy import Engine
 
 from spiderflow.config import get_settings
 from spiderflow.db import create_database_engine
-from spiderflow.services.database import ExchangeRateService
+from spiderflow.services.database import ExchangeRateSaveStatus, ExchangeRateService
 
 
 class ExchangeRatePipeline:
@@ -69,10 +69,17 @@ class ExchangeRatePipeline:
         if self.rate_service is None:
             raise RuntimeError("汇率数据库服务尚未初始化")
 
-        saved = self.rate_service.save_or_update(values)  # 将爬取并转化后的数据插入/更新到数据表
+        save_status = self.rate_service.save_or_update(values)
 
-        if not saved:
-            # 如果没变化，说明爬取到的数据中没有符合的币种（也有可能是完全相同的数据）
+        if save_status is ExchangeRateSaveStatus.CURRENCY_NOT_FOUND:
+            # 只有没有启用币种时才丢弃 Item，重复采集不再被误判为失败。
             raise DropItem(f"未找到启用中的币种：{item['currency_name']}")
+
+        spider.logger.info(
+            "汇率入库结果：币种=%s，发布时间=%s，状态=%s",
+            item["currency_name"],
+            item["published_at"],
+            save_status.value,
+        )
 
         return item
