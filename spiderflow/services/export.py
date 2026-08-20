@@ -32,6 +32,7 @@ class ExchangeRateExportService:
 
     def export_detail(self, dataframe: pd.DataFrame) -> Path:
         """导出分析明细表并返回文件路径。"""
+        # 确保输出目录存在，避免首次导出时写文件失败。
         self.output_dir.mkdir(parents=True, exist_ok=True)
         output_path = self.output_dir / f"{self.file_prefix}_detail.csv"
         # utf-8-sig 方便 Windows Excel 正确识别中文表头和币种名称。
@@ -40,6 +41,7 @@ class ExchangeRateExportService:
 
     def export_summary(self, dataframe: pd.DataFrame) -> Path:
         """导出区间极值汇总表并返回文件路径。"""
+        # 汇总表与明细表共用同一个输出目录。
         self.output_dir.mkdir(parents=True, exist_ok=True)
         output_path = self.output_dir / f"{self.file_prefix}_summary.csv"
         dataframe.to_csv(output_path, index=False, encoding="utf-8-sig")
@@ -47,8 +49,8 @@ class ExchangeRateExportService:
 
     def export(self, result: ExchangeRateAnalysisResult) -> ExchangeRateExportResult:
         """同时导出分析明细和区间汇总结果。"""
+        # 分别写出两张表，并统一返回生成的文件路径。
         return ExchangeRateExportResult(
             detail_path=self.export_detail(result.detail),
             summary_path=self.export_summary(result.summary),
         )
-

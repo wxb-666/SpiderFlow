@@ -74,25 +74,25 @@ class ExchangeRateAnalysisService:
             missing = ", ".join(sorted(missing_columns))
             raise ValueError(f"汇率数据缺少必要字段：{missing}")
 
-        # 统一时间和数值类型，便于后续排序及指标计算。
+        # 统一时间和数值类型，便于后续排序及指标计算。（乱码/空值等转化为nat）
         dataframe["published_at"] = pd.to_datetime(
             dataframe["published_at"], errors="coerce"
         )
         dataframe["middle_rate"] = pd.to_numeric(
             dataframe["middle_rate"], errors="coerce"
         )
-        dataframe = dataframe.dropna(subset=["code", "published_at", "middle_rate"])
-        if dataframe.empty:
+        dataframe = dataframe.dropna(subset=["code", "published_at", "middle_rate"])  # 这三个关键字有一个或多个为空，删除记录
+        if dataframe.empty:  # 如果没记录了，返回空表
             return self._empty_dataframe()
 
-        dataframe["trade_date"] = dataframe["published_at"].dt.normalize()
+        dataframe["trade_date"] = dataframe["published_at"].dt.normalize()  # 将具体时间全置为0
 
         # 同一币种同一天可能存在多次采集，只保留发布时间最新的一条。
         dataframe = (
-            dataframe.sort_values(["code", "trade_date", "published_at"])
-            .drop_duplicates(subset=["code", "trade_date"], keep="last")
-            .sort_values(["code", "trade_date"])
-            .reset_index(drop=True)
+            dataframe.sort_values(["code", "trade_date", "published_at"])  # 排序
+            .drop_duplicates(subset=["code", "trade_date"], keep="last")  # 去重，保留最后一行
+            .sort_values(["code", "trade_date"])  # 按货币和交易日期重新排序
+            .reset_index(drop=True)  # 重新生成索引
         )
         return dataframe
 
@@ -105,7 +105,7 @@ class ExchangeRateAnalysisService:
             result["daily_change_pct"] = pd.Series(dtype="float64")
             return result
 
-        result = result.sort_values(["code", "trade_date"]).reset_index(drop=True)
+        result = result.sort_values(["code", "trade_date"]).reset_index(drop=True)  # 按货币分组，并获取上一行的middle_rate
         previous_rate = result.groupby("code")["middle_rate"].shift(1)
         result["daily_change"] = result["middle_rate"] - previous_rate
         result["daily_change_pct"] = (
@@ -130,7 +130,7 @@ class ExchangeRateAnalysisService:
         result = result.sort_values(["code", "trade_date"]).reset_index(drop=True)
         column_name = f"moving_avg_{window}d"
         result[column_name] = result.groupby("code")["middle_rate"].transform(
-            lambda values: values.rolling(window=window, min_periods=1).mean()
+            lambda values: values.rolling(window=window, min_periods=1).mean()  # 计算窗口内的平均值，哪怕只有一天
         )
         # 保持需求中约定的 7 日字段名，其他窗口仍保留动态字段名。
         if window == 7:
@@ -146,7 +146,7 @@ class ExchangeRateAnalysisService:
             )
 
         rows: list[dict[str, Any]] = []
-        for (code, name), group in dataframe.groupby(["code", "name"], dropna=False):
+        for (code, name), group in dataframe.groupby(["code", "name"], dropna=False):  # 按货币代码+名称分组，并对每组进行计算
             max_index = group["middle_rate"].idxmax()
             min_index = group["middle_rate"].idxmin()
             rows.append(
