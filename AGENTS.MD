@@ -4,6 +4,7 @@
 
 ## 目标
 
+构建一个基于 Scrapy、Pandas、MySQL、APScheduler 和 Docker 的外汇牌价采集、存储、分析与自动化调度系统。
 
 ---
 
