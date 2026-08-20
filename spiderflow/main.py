@@ -21,11 +21,10 @@ def main() -> None:
     verify_database_connection(engine)
     logger.info("数据库连接成功，SpiderFlow 基础环境已就绪")
 
-    # 爬虫与定时任务将在后续阶段接入此应用容器。
+    # 定时任务由独立的 scheduler 容器负责，基础应用容器仅保持运行。
     while True:
         time.sleep(3600)
 
 
 if __name__ == "__main__":
     main()
-

@@ -44,6 +44,31 @@ services:
       - ./scrapy.cfg:/app/scrapy.cfg
       - ./data:/app/data
 
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spiderflow-scheduler
+    restart: unless-stopped
+    command: ["python", "-m", "spiderflow.scheduler.main"]
+    env_file:
+      - .env
+    environment:
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Shanghai}
+      SCHEDULE_HOUR: ${SCHEDULE_HOUR:-17}
+      SCHEDULE_MINUTE: ${SCHEDULE_MINUTE:-0}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./spiderflow:/app/spiderflow
+      - ./scrapy.cfg:/app/scrapy.cfg
+      - ./data:/app/data
+
 volumes:
   mysql_data:
-

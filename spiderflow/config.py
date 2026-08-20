@@ -14,6 +14,8 @@ class Settings:
     db_user: str
     db_password: str
     timezone: str
+    schedule_hour: int
+    schedule_minute: int
 
     @property
     def database_url(self) -> str:
@@ -42,5 +44,6 @@ def get_settings() -> Settings:
         db_user=required_values["MYSQL_USER"] or "",
         db_password=required_values["MYSQL_PASSWORD"] or "",
         timezone=os.getenv("APP_TIMEZONE", "Asia/Shanghai"),
+        schedule_hour=int(os.getenv("SCHEDULE_HOUR", "17")),
+        schedule_minute=int(os.getenv("SCHEDULE_MINUTE", "0")),
     )
-
